@@ -1,0 +1,8 @@
+# Configuración de Wokwi for VS Code.
+# El firmware se genera con PlatformIO (ver platformio.ini).
+# Para simular contra un broker Mosquitto propio, cambie "nube" por "local" en las dos rutas.
+
+[wokwi]
+version = 1
+firmware = '.pio/build/nube/firmware.bin'
+elf = '.pio/build/nube/firmware.elf'

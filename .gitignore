@@ -1,0 +1,27 @@
+# Variables de entorno y secretos (NUNCA subir al repositorio)
+.env
+*.env
+!.env.example
+
+# Certificados y contraseñas de Mosquitto
+*.key
+*.crt
+*.pem
+passwd
+
+# Material de trabajo para el video (no forma parte del entregable del repositorio)
+docs/
+
+# Compilación local del firmware (PlatformIO)
+.pio/
+
+# Node-RED y dependencias locales
+node_modules/
+.node-red/
+flows_cred.json
+.config.*.json
+
+# Archivos temporales y del sistema operativo
+.DS_Store
+Thumbs.db
+*.log

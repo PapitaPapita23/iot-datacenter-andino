@@ -1,0 +1,483 @@
+[
+  {
+    "id": "tab_datacenter_andino",
+    "type": "tab",
+    "label": "Monitoreo IoT - DataCenter Andino S.A.C.",
+    "disabled": false,
+    "info": "Flujo completo: Suscripción MQTT Mosquitto -> Validación de Datos -> Clasificación de Umbrales -> Generación de Alertas -> Escritura en InfluxDB."
+  },
+  {
+    "id": "mqtt_broker_cloud",
+    "type": "mqtt-broker",
+    "name": "Mosquitto (test.mosquitto.org)",
+    "broker": "test.mosquitto.org",
+    "port": "1883",
+    "clientid": "nodered-cloud-datacenter-andino",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "30",
+    "cleansession": true
+  },
+  {
+    "id": "influxdb_cloud_config",
+    "type": "influxdb",
+    "hostname": "127.0.0.1",
+    "port": "8086",
+    "protocol": "http",
+    "database": "monitoreo_datacenter",
+    "name": "InfluxDB v2 local (Editar URL y Token)",
+    "usetls": false,
+    "influxdbVersion": "2.0",
+    "url": "http://localhost:8086",
+    "rejectUnauthorized": true
+  },
+  {
+    "id": "node_mqtt_in",
+    "type": "mqtt in",
+    "z": "tab_datacenter_andino",
+    "name": "Suscribir Telemetría Sala Servidores",
+    "topic": "datacenter_andino/sala_servidores/telemetria",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "mqtt_broker_cloud",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 190,
+    "y": 120,
+    "wires": [
+      [
+        "node_validate_classify"
+      ]
+    ]
+  },
+  {
+    "id": "node_mqtt_in_lwt",
+    "type": "mqtt in",
+    "z": "tab_datacenter_andino",
+    "name": "Suscribir Estado Nodo (LWT)",
+    "topic": "datacenter_andino/sala_servidores/estado_nodo",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "mqtt_broker_cloud",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 200,
+    "wires": [
+      [
+        "node_debug_lwt"
+      ]
+    ]
+  },
+  {
+    "id": "node_debug_lwt",
+    "type": "debug",
+    "z": "tab_datacenter_andino",
+    "name": "Log Estado Conexión (LWT)",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.status",
+    "statusType": "msg",
+    "x": 460,
+    "y": 200,
+    "wires": []
+  },
+  {
+    "id": "node_validate_classify",
+    "type": "function",
+    "z": "tab_datacenter_andino",
+    "name": "Validar Payload y Clasificar Estados",
+    "func": "// =========================================================================\n// REGLAS OPERATIVAS DEL PROTOTIPO - DataCenter Andino S.A.C.\n// IMPORTANTE: Para evitar series triplicadas en InfluxDB y Grafana, los tags\n// contienen únicamente identificadores estáticos (node_id y location).\n// Los estados (NORMAL, ADVERTENCIA, CRITICO) se almacenan como fields.\n//\n// Salidas del nodo:\n//   1 -> lectura válida hacia la medición 'ambiente_sala'\n//   2 -> alerta de TEMPERATURA_CRITICA (InfluxDB 'eventos_alerta' + tópico MQTT de alertas)\n//   3 -> evento MEDICION_INVALIDA (solo InfluxDB 'eventos_alerta'; no es una alerta crítica)\n//\n// Todos los tiempos se miden con el reloj de Node-RED. El reloj del ESP32 simulado\n// no se usa para medir, porque se atrasa cuando la simulación corre por debajo del 100 %.\n// =========================================================================\n\nconst rxTimeMs = Date.now();\nconst p = msg.payload;\n\nif (!p || typeof p !== 'object') {\n    node.warn(\"Mensaje descartado: formato JSON inválido\");\n    return [null, null, null];\n}\n\nconst temp = Number(p.temperature_c);\nconst hum  = Number(p.humidity_pct);\nconst light = Number(p.light_pct);\nconst lightLux = Number(p.light_lux || 0);\nconst ldrRaw = Number(p.ldr_raw || 0);\nconst seqId = Number(p.seq_id || 0);\n\nconst tags = {\n    node_id: p.node_id || \"esp32-sala-01\",\n    location: p.location || \"Sala_Servidores_Principal\"\n};\n\n// 1. Validar errores de sensor (NaN, nulos o fuera de rango físico)\nif (p.sensor_error === true || p.temperature_c === null || isNaN(temp) || isNaN(light) || temp < -10 || temp > 85 || light < 0 || light > 100) {\n    node.warn(`Medición inválida descartada en seq_id=${seqId}`);\n    const invalidEvent = {\n        measurement: \"eventos_alerta\",\n        payload: [\n            {\n                tipo_evento: \"MEDICION_INVALIDA\",\n                mensaje: `Lectura inválida (NaN o fuera de rango) filtrada por Node-RED en seq_id=${seqId}`,\n                seq_id: seqId\n            },\n            Object.assign({ severidad: \"ERROR_SENSOR\" }, tags)\n        ]\n    };\n    return [null, null, invalidEvent];\n}\n\n// 2. Clasificación de Temperatura (Regla 4)\nlet estadoTemp = \"NORMAL\";\nlet codigoEstadoTemp = 0; // 0=NORMAL (<28°C), 1=ADVERTENCIA (28-29.9°C), 2=CRITICO (>=30°C)\nif (temp >= 30.0) {\n    estadoTemp = \"CRITICO\";\n    codigoEstadoTemp = 2;\n} else if (temp >= 28.0) {\n    estadoTemp = \"ADVERTENCIA\";\n    codigoEstadoTemp = 1;\n}\n\n// 3. Clasificación de Iluminación (Porcentaje calibrado del LDR)\nlet estadoLuz = \"APAGADO\";\nlet codigoEstadoLuz = 0; // 0=APAGADO (<20%), 1=ILUMINACION_PARCIAL (20-59%), 2=ENCENDIDO (>=60%)\nif (light >= 60.0) {\n    estadoLuz = \"ENCENDIDO\";\n    codigoEstadoLuz = 2;\n} else if (light >= 20.0) {\n    estadoLuz = \"ILUMINACION_PARCIAL\";\n    codigoEstadoLuz = 1;\n}\n\n// 4. Intervalo real entre lecturas consecutivas (ms), medido al recibirlas en Node-RED.\n// Se omite en la primera lectura y tras un silencio de más de 60 s (corte de publicaciones).\nconst lastRx = context.get(\"lastRxMs\");\nconst lastNonCriticalRx = context.get(\"lastNonCriticalRxMs\");\nconst wasCritical = context.get(\"wasCritical\") === true;\nlet intervaloMs = null;\nif (typeof lastRx === \"number\" && rxTimeMs - lastRx <= 60000) {\n    intervaloMs = rxTimeMs - lastRx;\n}\n\n// 5. Estructura para InfluxDB (Salida 1: Serie Temporal Principal 'ambiente_sala')\n// NOTA CRÍTICA: Tags estáticos (node_id, location) -> 1 sola serie continua en Grafana.\nconst fields = {\n    temperature_c: Number(temp.toFixed(2)),\n    humidity_pct: Number(hum.toFixed(2)),\n    light_pct: Number(light.toFixed(2)),\n    light_lux: Number(lightLux.toFixed(1)),\n    ldr_raw: ldrRaw,\n    estado_temp_str: estadoTemp,\n    estado_temp_code: codigoEstadoTemp,\n    estado_luz_str: estadoLuz,\n    estado_luz_code: codigoEstadoLuz,\n    seq_id: seqId\n};\nif (intervaloMs !== null) {\n    fields.intervalo_ms = intervaloMs;\n}\nconst msgInflux = {\n    measurement: \"ambiente_sala\",\n    payload: [fields, tags]\n};\n\n// 6. Si está en condición CRÍTICA (>= 30 °C), generar evento de alerta inmediata (Salida 2)\n// tiempo_deteccion_ms se registra solo en la primera lectura crítica de cada episodio:\n// es el tiempo transcurrido desde la última lectura NO crítica recibida hasta que se genera\n// la alerta. La sala cruzó el umbral en algún momento de ese intervalo, por lo que es la\n// cota superior del tiempo real de detección (aprox. un periodo de muestreo).\nlet msgAlerta = null;\nif (estadoTemp === \"CRITICO\") {\n    const alertFields = {\n        tipo_evento: \"TEMPERATURA_CRITICA\",\n        temperature_c: Number(temp.toFixed(2)),\n        light_pct: Number(light.toFixed(2)),\n        umbral_superado: 30.0,\n        mensaje: `ALERTA CRÍTICA: Temperatura alcanzó ${temp.toFixed(2)} °C (>= 30.0 °C). Revisar climatización.`,\n        seq_id: seqId\n    };\n    if (!wasCritical && typeof lastNonCriticalRx === \"number\" && rxTimeMs - lastNonCriticalRx <= 60000) {\n        alertFields.tiempo_deteccion_ms = Date.now() - lastNonCriticalRx;\n    }\n    msgAlerta = {\n        measurement: \"eventos_alerta\",\n        topic: \"datacenter_andino/sala_servidores/alertas\",\n        payload: [\n            alertFields,\n            Object.assign({ severidad: \"CRITICO\" }, tags)\n        ]\n    };\n}\n\ncontext.set(\"lastRxMs\", rxTimeMs);\ncontext.set(\"wasCritical\", estadoTemp === \"CRITICO\");\nif (estadoTemp !== \"CRITICO\") {\n    context.set(\"lastNonCriticalRxMs\", rxTimeMs);\n}\n\nreturn [msgInflux, msgAlerta, null];\n",
+    "outputs": 3,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 510,
+    "y": 120,
+    "wires": [
+      [
+        "node_influx_ambiente",
+        "node_debug_telemetria"
+      ],
+      [
+        "node_influx_alertas",
+        "node_mqtt_out_alerta",
+        "node_debug_alerta"
+      ],
+      [
+        "node_influx_alertas",
+        "node_debug_invalida"
+      ]
+    ]
+  },
+  {
+    "id": "node_influx_ambiente",
+    "type": "influxdb out",
+    "z": "tab_datacenter_andino",
+    "influxdb": "influxdb_cloud_config",
+    "name": "Escribir en InfluxDB (ambiente_sala)",
+    "measurement": "ambiente_sala",
+    "precision": "ms",
+    "retentionPolicy": "",
+    "database": "monitoreo_datacenter",
+    "precisionV18FluxV20": "ms",
+    "retentionPolicyV18Flux": "",
+    "org": "DataCenter_Andino_SAC",
+    "bucket": "monitoreo_datacenter",
+    "x": 850,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "node_influx_alertas",
+    "type": "influxdb out",
+    "z": "tab_datacenter_andino",
+    "influxdb": "influxdb_cloud_config",
+    "name": "Registrar Alerta en InfluxDB (eventos_alerta)",
+    "measurement": "eventos_alerta",
+    "precision": "ms",
+    "retentionPolicy": "",
+    "database": "monitoreo_datacenter",
+    "precisionV18FluxV20": "ms",
+    "retentionPolicyV18Flux": "",
+    "org": "DataCenter_Andino_SAC",
+    "bucket": "monitoreo_datacenter",
+    "x": 870,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "node_mqtt_out_alerta",
+    "type": "mqtt out",
+    "z": "tab_datacenter_andino",
+    "name": "Publicar Alerta Crítica MQTT (QoS 1)",
+    "topic": "datacenter_andino/sala_servidores/alertas",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "mqtt_broker_cloud",
+    "x": 850,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "node_debug_telemetria",
+    "type": "debug",
+    "z": "tab_datacenter_andino",
+    "name": "Log Telemetría Validada",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload[0].temperature_c",
+    "statusType": "msg",
+    "x": 820,
+    "y": 30,
+    "wires": []
+  },
+  {
+    "id": "node_debug_alerta",
+    "type": "debug",
+    "z": "tab_datacenter_andino",
+    "name": "Log ALERTA CRÍTICA",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload[0].mensaje",
+    "statusType": "msg",
+    "x": 810,
+    "y": 280,
+    "wires": []
+  },
+  {
+    "id": "node_debug_invalida",
+    "type": "debug",
+    "z": "tab_datacenter_andino",
+    "name": "Log MEDICIÓN INVÁLIDA",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload[0].mensaje",
+    "statusType": "msg",
+    "x": 820,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "inject_escenario_a",
+    "type": "inject",
+    "z": "tab_datacenter_andino",
+    "name": "Prueba (a): Normal (24.5°C, 6 lux = 12%)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":101,\"temperature_c\":24.5,\"humidity_pct\":48.0,\"ldr_raw\":3604,\"light_lux\":6.0,\"light_pct\":12.0,\"sensor_error\":false}",
+    "payloadType": "json",
+    "x": 220,
+    "y": 280,
+    "wires": [
+      [
+        "node_validate_classify"
+      ]
+    ]
+  },
+  {
+    "id": "inject_escenario_b",
+    "type": "inject",
+    "z": "tab_datacenter_andino",
+    "name": "Prueba (b): Advertencia (28.8°C, 7 lux = 14%)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":102,\"temperature_c\":28.8,\"humidity_pct\":46.5,\"ldr_raw\":3522,\"light_lux\":7.2,\"light_pct\":14.0,\"sensor_error\":false}",
+    "payloadType": "json",
+    "x": 230,
+    "y": 330,
+    "wires": [
+      [
+        "node_validate_classify"
+      ]
+    ]
+  },
+  {
+    "id": "inject_escenario_c",
+    "type": "inject",
+    "z": "tab_datacenter_andino",
+    "name": "Prueba (c): Crítico + Alerta (33.0°C, 8 lux = 15%)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":103,\"temperature_c\":33.0,\"humidity_pct\":42.0,\"ldr_raw\":3481,\"light_lux\":8.0,\"light_pct\":15.0,\"sensor_error\":false}",
+    "payloadType": "json",
+    "x": 240,
+    "y": 380,
+    "wires": [
+      [
+        "node_validate_classify"
+      ]
+    ]
+  },
+  {
+    "id": "inject_escenario_d",
+    "type": "inject",
+    "z": "tab_datacenter_andino",
+    "name": "Prueba (d): Cambio Luz Activa (25.0°C, 1400 lux = 86.5%)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":104,\"temperature_c\":25.0,\"humidity_pct\":47.5,\"ldr_raw\":553,\"light_lux\":1400.0,\"light_pct\":86.5,\"sensor_error\":false}",
+    "payloadType": "json",
+    "x": 250,
+    "y": 430,
+    "wires": [
+      [
+        "node_validate_classify"
+      ]
+    ]
+  },
+  {
+    "id": "inject_escenario_e",
+    "type": "inject",
+    "z": "tab_datacenter_andino",
+    "name": "Prueba (e): Lectura Inválida NaN / Error Sensor",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":105,\"temperature_c\":null,\"humidity_pct\":null,\"ldr_raw\":3500,\"light_lux\":7.5,\"light_pct\":14.5,\"sensor_error\":true}",
+    "payloadType": "json",
+    "x": 240,
+    "y": 480,
+    "wires": [
+      [
+        "node_validate_classify"
+      ]
+    ]
+  },
+  {
+    "id": "probe_comment",
+    "type": "comment",
+    "z": "tab_datacenter_andino",
+    "name": "KPI 1: sonda de latencia MQTT (Node-RED -> Mosquitto -> Node-RED) cada 10 s",
+    "info": "Publica una marca de tiempo en el broker y mide cuánto tarda en volver. Usa un solo reloj (el de Node-RED), por lo que no depende de la velocidad de la simulación de Wokwi.",
+    "x": 310,
+    "y": 560,
+    "wires": []
+  },
+  {
+    "id": "probe_inject",
+    "type": "inject",
+    "z": "tab_datacenter_andino",
+    "name": "Cada 10 s",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "10",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "5",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 130,
+    "y": 610,
+    "wires": [
+      [
+        "probe_build"
+      ]
+    ]
+  },
+  {
+    "id": "probe_build",
+    "type": "function",
+    "z": "tab_datacenter_andino",
+    "name": "Armar sonda",
+    "func": "msg.payload = { enviado_ms: Date.now() };\nreturn msg;\n",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 300,
+    "y": 610,
+    "wires": [
+      [
+        "probe_mqtt_out"
+      ]
+    ]
+  },
+  {
+    "id": "probe_mqtt_out",
+    "type": "mqtt out",
+    "z": "tab_datacenter_andino",
+    "name": "Publicar sonda",
+    "topic": "datacenter_andino/sala_servidores/sonda_latencia",
+    "qos": "0",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "mqtt_broker_cloud",
+    "x": 490,
+    "y": 610,
+    "wires": []
+  },
+  {
+    "id": "probe_mqtt_in",
+    "type": "mqtt in",
+    "z": "tab_datacenter_andino",
+    "name": "Recibir sonda",
+    "topic": "datacenter_andino/sala_servidores/sonda_latencia",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "mqtt_broker_cloud",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 130,
+    "y": 670,
+    "wires": [
+      [
+        "probe_measure"
+      ]
+    ]
+  },
+  {
+    "id": "probe_measure",
+    "type": "function",
+    "z": "tab_datacenter_andino",
+    "name": "Medir latencia MQTT",
+    "func": "// Latencia de ida y vuelta al broker, medida con el reloj de Node-RED.\nconst enviado = Number(msg.payload && msg.payload.enviado_ms);\nconst latencia = Date.now() - enviado;\nif (!enviado || latencia < 0 || latencia > 30000) {\n    return null; // sonda ajena o inválida\n}\nnode.status({ fill: \"green\", shape: \"dot\", text: latencia + \" ms\" });\nreturn {\n    measurement: \"diagnostico_enlace\",\n    payload: [\n        { latencia_mqtt_ms: latencia },\n        { origen: \"nodered\" }\n    ]\n};\n",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 330,
+    "y": 670,
+    "wires": [
+      [
+        "probe_influx"
+      ]
+    ]
+  },
+  {
+    "id": "probe_influx",
+    "type": "influxdb out",
+    "z": "tab_datacenter_andino",
+    "influxdb": "influxdb_cloud_config",
+    "name": "Escribir en InfluxDB (diagnostico_enlace)",
+    "measurement": "diagnostico_enlace",
+    "precision": "ms",
+    "retentionPolicy": "",
+    "database": "monitoreo_datacenter",
+    "precisionV18FluxV20": "ms",
+    "retentionPolicyV18Flux": "",
+    "org": "DataCenter_Andino_SAC",
+    "bucket": "monitoreo_datacenter",
+    "x": 610,
+    "y": 670,
+    "wires": []
+  }
+]

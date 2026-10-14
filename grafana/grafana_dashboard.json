@@ -1,0 +1,582 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB",
+      "label": "InfluxDB (Flux)",
+      "description": "Seleccione su fuente de datos InfluxDB conectada al bucket monitoreo_datacenter",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "influxdb",
+      "name": "InfluxDB",
+      "version": "1.0.0"
+    }
+  ],
+  "title": "DataCenter Andino S.A.C. - Monitoreo Ambiental Sala de Servidores",
+  "uid": "datacenter-andino-iot-pa3",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 6,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Última Temperatura (°C)",
+      "type": "gauge",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "min": 15,
+          "max": 40,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 28
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"temperature_c\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Estado de Monitoreo Térmico",
+      "type": "stat",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 4,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "NORMAL (<28°C)",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "ADVERTENCIA (28-30°C)",
+                  "color": "orange"
+                },
+                "2": {
+                  "text": "CRÍTICO (>=30°C)",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"estado_temp_code\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Iluminación Calibrada (%)",
+      "type": "gauge",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 9,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "orange",
+                "value": 60
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"light_pct\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Estado de Luminarias",
+      "type": "stat",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 13,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "APAGADO (<20%)",
+                  "color": "blue"
+                },
+                "1": {
+                  "text": "PARCIAL (20-59%)",
+                  "color": "yellow"
+                },
+                "2": {
+                  "text": "ENCENDIDO (>=60%)",
+                  "color": "orange"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"estado_luz_code\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Última Lectura: Fecha, Hora y Secuencia",
+      "type": "stat",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "wideLayout": false,
+        "justifyMode": "center",
+        "text": {
+          "titleSize": 14,
+          "valueSize": 26
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              },
+              {
+                "id": "displayName",
+                "value": "Fecha y hora"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "displayName",
+                "value": "Paquete (seq_id)"
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"seq_id\")\n  |> group()\n  |> last()\n  |> map(fn: (r) => ({_value: int(v: r._time) / 1000000}))"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "B",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"seq_id\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_value\"])"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Tendencia Histórica de Temperatura (°C) [Umbrales: 28 °C y 30 °C]",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "always",
+            "spanNulls": false,
+            "insertNulls": 30000,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            },
+            "axisSoftMin": 22,
+            "axisSoftMax": 34
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 28
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          },
+          "displayName": "Temperatura (°C)"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"temperature_c\")\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Tendencia Histórica de Iluminación LDR (%)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "always",
+            "spanNulls": false,
+            "insertNulls": 30000
+          },
+          "displayName": "Iluminación (%)"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"light_pct\")\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Bitácora de Alertas Críticas y Eventos Registrados (Node-RED -> InfluxDB)",
+      "type": "table",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_INFLUXDB}"
+          },
+          "refId": "A",
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"eventos_alerta\")\n  |> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> group()\n  |> drop(columns: [\"_start\", \"_stop\", \"_measurement\"])\n  |> sort(columns: [\"_time\"], desc: true)"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "location": true,
+              "light_pct": true
+            },
+            "indexByName": {
+              "_time": 0,
+              "tipo_evento": 1,
+              "severidad": 2,
+              "temperature_c": 3,
+              "umbral_superado": 4,
+              "tiempo_deteccion_ms": 5,
+              "seq_id": 6,
+              "node_id": 7,
+              "mensaje": 8
+            },
+            "renameByName": {
+              "_time": "Fecha y hora",
+              "tipo_evento": "Evento",
+              "severidad": "Severidad",
+              "temperature_c": "Temperatura (°C)",
+              "umbral_superado": "Umbral (°C)",
+              "tiempo_deteccion_ms": "Detección (ms)",
+              "seq_id": "seq_id",
+              "node_id": "Nodo",
+              "mensaje": "Mensaje"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fecha y hora"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 185
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Evento"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 205
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severidad"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 135
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Temperatura (°C)"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Umbral (°C)"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detección (ms)"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 125
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seq_id"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 75
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Nodo"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

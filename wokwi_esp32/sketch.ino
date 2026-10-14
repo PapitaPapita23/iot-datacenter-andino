@@ -1,7 +1,7 @@
 /**
  * PRÁCTICA ACADÉMICA 3 - Herramientas de Desarrollo Profesional (TIC)
  * Caso Empresarial: DataCenter Andino S.A.C.
- * Entorno: Nodo simulado en Wokwi + broker Mosquitto + Node-RED, InfluxDB y Grafana locales
+ * Entorno: Nodo simulado en Wokwi for VS Code + Mosquitto, Node-RED, InfluxDB y Grafana locales
  *
  * Componentes en Wokwi:
  *  - ESP32 DevKit V4
@@ -35,10 +35,11 @@
 const char* WIFI_SSID = "Wokwi-GUEST";
 const char* WIFI_PASSWORD = "";
 
-// Configuración del Broker Mosquitto. Por defecto, el broker público en la nube.
-// Al compilar con PlatformIO (-e local) se reemplaza por un broker propio.
+// Configuración del Broker Mosquitto. Por defecto, el broker local de este equipo:
+// desde la simulación de Wokwi for VS Code, el equipo anfitrión es host.wokwi.internal.
+// Al compilar con PlatformIO (-e publico) se reemplaza por test.mosquitto.org.
 #ifndef MQTT_BROKER_HOST
-#define MQTT_BROKER_HOST "test.mosquitto.org"
+#define MQTT_BROKER_HOST "host.wokwi.internal"
 #endif
 const char* MQTT_BROKER = MQTT_BROKER_HOST;
 const int   MQTT_PORT = 1883;

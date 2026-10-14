@@ -9,7 +9,7 @@ Repositorio de la **Práctica Académica 3 (Unidad 3: Internet de las Cosas)** d
 [ESP32 (cliente MQTT publicador)] ── Wi-Fi Wokwi-GUEST, JSON cada 5 s
         │
         ▼
-[Broker Mosquitto: test.mosquitto.org:1883]
+[Broker Mosquitto local (puerto 1883)]
         │
         ▼
 [Node-RED local (puerto 1880): suscribe, valida, clasifica y genera alertas]
@@ -55,14 +55,13 @@ Repositorio de la **Práctica Académica 3 (Unidad 3: Internet de las Cosas)** d
 | Componente | Requisito |
 | :--- | :--- |
 | Sistema | Windows 10 u 11 (los scripts de arranque son PowerShell; los componentes también existen para Linux y macOS) |
-| Simulador | VS Code con la extensión Wokwi, Python 3 y PlatformIO Core; o bien un navegador con acceso a [wokwi.com](https://wokwi.com). No requiere hardware |
-| Broker MQTT | Salida a Internet por el puerto TCP `1883` hacia `test.mosquitto.org` |
-| Clientes Mosquitto | Eclipse Mosquitto instalado en el equipo (aporta `mosquitto_sub` para verificar el broker) |
+| Simulador | VS Code con la extensión Wokwi, Python 3 y PlatformIO Core. No requiere hardware |
+| Broker MQTT | Eclipse Mosquitto 2.x instalado en el equipo como servicio (incluye `mosquitto_sub` para verificar el broker) |
 | Node-RED | Node.js LTS y Node-RED 3 o superior, con el paquete `node-red-contrib-influxdb` |
 | InfluxDB | InfluxDB OSS 2.7 (binario para Windows) |
 | Grafana | Grafana OSS 10.1 o superior (binario para Windows) |
 
-Ningún componente usa Docker ni contenedores. Probado con Node-RED 5.0, InfluxDB 2.7.11 y Grafana 11.6.
+Todos los servicios corren en el propio equipo y ninguno usa Docker ni contenedores. Probado con Mosquitto 2.1.2, Node-RED 5.0, InfluxDB 2.7.11 y Grafana 11.6.
 
 ---
 
@@ -72,17 +71,20 @@ Ningún componente usa Docker ni contenedores. Probado con Node-RED 5.0, InfluxD
 
 | Parámetro | Valor |
 | :--- | :--- |
-| Host | `test.mosquitto.org` (broker público del proyecto Eclipse Mosquitto) |
+| Host | `localhost` (`127.0.0.1`). El ESP32 simulado lo alcanza como `host.wokwi.internal` |
 | Puerto | `1883` (TCP sin cifrar; `8883` con TLS en la propuesta productiva) |
+| Alcance | Solo acepta conexiones del propio equipo |
 | Autenticación | Anónima (sin usuario ni contraseña) |
+| Archivo de configuración | `mosquitto/mosquitto.conf`, copiado a `C:\Program Files\mosquitto\mosquitto.conf` |
+| Registro | `C:\ProgramData\mosquitto\mosquitto.log` (conexiones y desconexiones de clientes) |
 | Client ID del ESP32 | `esp32-datacenter-andino-nodo01` |
-| Client ID de Node-RED | `nodered-cloud-datacenter-andino` |
+| Client ID de Node-RED | `nodered-datacenter-andino` |
 | KeepAlive | `10 s` en el ESP32, `30 s` en Node-RED |
 | QoS | Telemetría del ESP32 en QoS 0 (límite de `PubSubClient`); LWT, suscripciones y alertas de Node-RED en QoS 1 |
 
 Dos clientes con el mismo Client ID se desconectan entre sí: ejecute una sola simulación de Wokwi y una sola instancia de Node-RED a la vez.
 
-Para usar un broker propio en lugar del público, instale Mosquitto y arránquelo con `mosquitto -c mosquitto/mosquitto.conf` (ajuste antes las rutas de `persistence_location` y `log_dest` a su sistema). Con Wokwi for VS Code, compile el firmware con `python -m platformio run -d wokwi_esp32 -e local` y cambie `nube` por `local` en `wokwi_esp32/wokwi.toml`; el nodo se conectará a `host.wokwi.internal`, que es el propio equipo. El simulador web de Wokwi solo alcanza brokers accesibles desde Internet.
+Wokwi for VS Code permite que el ESP32 simulado llegue a los servicios del propio equipo con el nombre `host.wokwi.internal`. El simulador web de wokwi.com no puede hacerlo: para usarlo hay que compilar el entorno `publico` (`python -m platformio run -d wokwi_esp32 -e publico`), que apunta al broker de pruebas `test.mosquitto.org`, y poner ese mismo host en el nodo de broker de Node-RED.
 
 ### 3.2. Tópicos MQTT
 
@@ -164,14 +166,24 @@ Siga los pasos en este orden. Las rutas de ejemplo usan la carpeta `%USERPROFILE
    ```
 2. **InfluxDB.** Descargue el binario de InfluxDB OSS 2.7 para Windows desde [influxdata.com/downloads](https://www.influxdata.com/downloads/) y descomprímalo de modo que quede `%USERPROFILE%\iot-datacenter-local\influxdb\influxd.exe`.
 3. **Grafana.** Descargue el binario independiente (zip) de Grafana OSS para Windows desde [grafana.com/grafana/download](https://grafana.com/grafana/download?platform=windows) y descomprímalo en `%USERPROFILE%\iot-datacenter-local\` (quedará una carpeta `grafana-v…` con `bin\grafana.exe`).
-4. **Variables de entorno.** Copie `.env.example` como `.env` y defina `GRAFANA_PASSWORD`: será la contraseña del usuario `admin` de Grafana. El archivo `.env` no se sube al repositorio.
+4. **Mosquitto.** Instálelo con `winget install EclipseFoundation.Mosquitto` o con el instalador de [mosquitto.org/download](https://mosquitto.org/download/). Queda como servicio de Windows.
+5. **Variables de entorno.** Copie `.env.example` como `.env` y defina `GRAFANA_PASSWORD`: será la contraseña del usuario `admin` de Grafana. El archivo `.env` no se sube al repositorio.
 
-### Paso 2: Arrancar los servicios
-Desde la carpeta raíz del proyecto:
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\iniciar_servicios.ps1
-```
-El script abre InfluxDB (`http://localhost:8086`), Grafana (`http://localhost:3000`) y Node-RED (`http://localhost:1880`), cada uno en su ventana, y muestra cuáles quedaron listos. Los tres escuchan solo en el propio equipo. Para detenerlos, ejecute `scripts\detener_servicios.ps1`.
+### Paso 2: Configurar el broker Mosquitto y arrancar los servicios
+1. Aplique la configuración del repositorio al broker. En PowerShell **como administrador**, desde la carpeta raíz del proyecto:
+   ```powershell
+   New-Item -ItemType Directory -Force C:\ProgramData\mosquitto
+   Copy-Item mosquitto\mosquitto.conf "C:\Program Files\mosquitto\mosquitto.conf"
+   Restart-Service mosquitto
+   ```
+   El broker queda escuchando en `localhost:1883` y arranca solo con Windows.
+2. Arranque los otros tres servicios, ya sin permisos de administrador:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\iniciar_servicios.ps1
+   ```
+   El script abre InfluxDB (`http://localhost:8086`), Grafana (`http://localhost:3000`) y Node-RED (`http://localhost:1880`), cada uno en su ventana, y muestra cuáles quedaron listos. Para detenerlos, ejecute `scripts\detener_servicios.ps1`.
+
+Los cuatro servicios escuchan solo en el propio equipo.
 
 ### Paso 3: Configurar InfluxDB
 1. Abra `http://localhost:8086` y complete la configuración inicial: usuario y contraseña, organización **`DataCenter_Andino_SAC`** y bucket **`monitoreo_datacenter`**.
@@ -184,35 +196,24 @@ El script abre InfluxDB (`http://localhost:8086`), Grafana (`http://localhost:30
 4. Verifique en ese nodo y en **`Registrar Alerta en InfluxDB (eventos_alerta)`** que **Organization** sea `DataCenter_Andino_SAC` y **Bucket** sea `monitoreo_datacenter`.
 5. Pulse **Deploy**. Los dos nodos MQTT deben mostrar **`connected`** en verde.
 
-### Paso 5: Ejecutar el nodo ESP32 en Wokwi
-
-Elija una de las dos opciones. El circuito y el código son los mismos.
-
-**Opción A — Wokwi for VS Code**
+### Paso 5: Ejecutar el nodo ESP32 en Wokwi for VS Code
 1. Instale en VS Code la extensión **Wokwi Simulator** y active su licencia (`F1` → `Wokwi: Request a New License`).
 2. Instale PlatformIO Core y compile el firmware (la primera vez descarga el compilador del ESP32):
    ```bash
    python -m pip install --user platformio
    python -m platformio run -d wokwi_esp32
    ```
-3. Abra `wokwi_esp32/diagram.json` en VS Code y ejecute `F1` → `Wokwi: Start Simulator`.
+3. Abra `wokwi_esp32/diagram.json` en VS Code y ejecute `F1` → `Wokwi: Start Simulator`. Si VS Code pide un archivo de configuración, elija `wokwi_esp32/wokwi.toml`.
 4. Tras modificar `sketch.ino`, repita la compilación del punto 2 y reinicie la simulación.
 
-**Opción B — Wokwi en el navegador**
-1. Abra un proyecto nuevo en [Wokwi ESP32](https://wokwi.com/projects/new/esp32).
-2. Reemplace el contenido de `sketch.ino` y `diagram.json` con los archivos de `wokwi_esp32/`, y cree `libraries.txt` con el contenido del archivo del mismo nombre.
-3. Pulse **Start the simulation**.
-
-En ambas opciones, el monitor serial mostrará la conexión a `Wokwi-GUEST` y una línea `[MQTT PUB QoS0 #...]` cada 5 segundos. Compruebe que la primera lectura de luz sea cercana a `12 %`; si no lo es, haga clic en el sensor LDR y lleve el deslizador a `6 lux`.
+El monitor serial mostrará la conexión a `Wokwi-GUEST`, la conexión al broker `host.wokwi.internal` y una línea `[MQTT PUB QoS0 #...]` cada 5 segundos. Compruebe que la primera lectura de luz sea cercana a `12 %`; si no lo es, haga clic en el sensor LDR y lleve el deslizador a `6 lux`.
 
 ### Paso 6: Verificar la recepción en el broker Mosquitto
-1. Instale Eclipse Mosquitto con el instalador de [mosquitto.org/download](https://mosquitto.org/download/), o en Windows con `winget install EclipseFoundation.Mosquitto`.
-2. Suscríbase a los tres tópicos del proyecto:
+1. Suscríbase a los tres tópicos del proyecto:
    ```powershell
-   & "C:\Program Files\mosquitto\mosquitto_sub.exe" -h test.mosquitto.org -p 1883 -v -t "datacenter_andino/sala_servidores/telemetria" -t "datacenter_andino/sala_servidores/alertas" -t "datacenter_andino/sala_servidores/estado_nodo"
+   & "C:\Program Files\mosquitto\mosquitto_sub.exe" -h localhost -p 1883 -v -t "datacenter_andino/sala_servidores/telemetria" -t "datacenter_andino/sala_servidores/alertas" -t "datacenter_andino/sala_servidores/estado_nodo"
    ```
-   En Linux o macOS se usa el mismo comando empezando por `mosquitto_sub`.
-3. Debe aparecer el estado retenido `CONECTADO` y, cada 5 segundos, un mensaje JSON de telemetría.
+2. Debe aparecer el estado retenido `CONECTADO` y, cada 5 segundos, un mensaje JSON de telemetría.
 
 ### Paso 7: Conectar Grafana con InfluxDB e importar el dashboard
 1. Abra `http://localhost:3000` e ingrese con el usuario `admin` y la contraseña definida en `.env`.

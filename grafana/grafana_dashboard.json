@@ -27,7 +27,7 @@
   "uid": "datacenter-andino-iot-pa3",
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 6,
+  "version": 7,
   "refresh": "5s",
   "time": {
     "from": "now-15m",
@@ -79,7 +79,7 @@
             "uid": "${DS_INFLUXDB}"
           },
           "refId": "A",
-          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"temperature_c\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"temperature_c\")\n  |> group(columns: [\"_field\"])\n  |> last()"
         }
       ]
     },
@@ -127,7 +127,7 @@
             "uid": "${DS_INFLUXDB}"
           },
           "refId": "A",
-          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"estado_temp_code\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"estado_temp_code\")\n  |> group(columns: [\"_field\"])\n  |> last()"
         }
       ]
     },
@@ -176,7 +176,7 @@
             "uid": "${DS_INFLUXDB}"
           },
           "refId": "A",
-          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"light_pct\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"light_pct\")\n  |> group(columns: [\"_field\"])\n  |> last()"
         }
       ]
     },
@@ -224,7 +224,7 @@
             "uid": "${DS_INFLUXDB}"
           },
           "refId": "A",
-          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"estado_luz_code\")\n  |> group(columns: [\"_field\"])\n  |> last()"
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"estado_luz_code\")\n  |> group(columns: [\"_field\"])\n  |> last()"
         }
       ]
     },
@@ -305,7 +305,7 @@
             "uid": "${DS_INFLUXDB}"
           },
           "refId": "A",
-          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"seq_id\")\n  |> group()\n  |> last()\n  |> map(fn: (r) => ({_value: int(v: r._time) / 1000000}))"
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"seq_id\")\n  |> group()\n  |> last()\n  |> map(fn: (r) => ({_value: int(v: r._time) / 1000000}))"
         },
         {
           "datasource": {
@@ -313,7 +313,7 @@
             "uid": "${DS_INFLUXDB}"
           },
           "refId": "B",
-          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: -15m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"seq_id\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_value\"])"
+          "query": "from(bucket: \"monitoreo_datacenter\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ambiente_sala\" and r[\"_field\"] == \"seq_id\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_value\"])"
         }
       ]
     },

@@ -181,7 +181,7 @@ Siga los pasos en este orden. Las rutas de ejemplo usan la carpeta `%USERPROFILE
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts\iniciar_servicios.ps1
    ```
-   El script abre InfluxDB (`http://localhost:8086`), Grafana (`http://localhost:3000`) y Node-RED (`http://localhost:1880`), cada uno en su ventana, y muestra cuáles quedaron listos. Para detenerlos, ejecute `scripts\detener_servicios.ps1`.
+   El script inicia InfluxDB (`http://localhost:8086`), Grafana (`http://localhost:3000`) y Node-RED (`http://localhost:1880`) en segundo plano y muestra cuáles quedaron listos. La salida de cada uno queda en `%USERPROFILE%\iot-datacenter-local\datos\logs`. Para detenerlos, ejecute `scripts\detener_servicios.ps1`.
 
 Los cuatro servicios escuchan solo en el propio equipo.
 
@@ -270,7 +270,7 @@ El archivo `influxdb/influxdb_queries.flux` contiene:
 
 En Wokwi la simulación puede correr por debajo del tiempo real; en ese caso las lecturas llegan cada más de 5 s reales y el KPI 3 crece en la misma proporción.
 
-Las consultas se ejecutan en el **Data Explorer** de InfluxDB (`http://localhost:8086`, con el editor de scripts) o en **Explore** de Grafana. Para que el KPI 2 sea válido, no reinicie la simulación de Wokwi ni pulse las pruebas (a)–(d) de Node-RED dentro de la ventana de 15 minutos.
+Las consultas se ejecutan en el **Data Explorer** de InfluxDB (`http://localhost:8086`, con el editor de scripts) o en **Explore** de Grafana. Para que el KPI 2 sea válido, no reinicie la simulación de Wokwi dentro de la ventana de 15 minutos.
 
 ---
 

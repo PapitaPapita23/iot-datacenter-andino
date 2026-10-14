@@ -7,13 +7,14 @@
 // Dónde ejecutarlas:
 //  - InfluxDB (http://localhost:8086) -> Data Explorer -> Script Editor, o
 //  - Grafana (http://localhost:3000) -> Explore, con la fuente de datos InfluxDB en modo Flux.
-// Las consultas 6, 7 y 8 usan el rango de tiempo del panel (v.timeRangeStart / v.timeRangeStop).
+// Las consultas 1 a 8 usan el rango de tiempo del panel (v.timeRangeStart / v.timeRangeStop);
+// para ejecutarlas en el Data Explorer, elija el rango con el selector de tiempo.
 // ============================================================================
 
 // 1. PANEL GRAFANA: Última Lectura de Temperatura (°C)
 // Se usa group() antes de last() para garantizar un único valor escalar
 from(bucket: "monitoreo_datacenter")
-  |> range(start: -15m)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "ambiente_sala")
   |> filter(fn: (r) => r["_field"] == "temperature_c")
   |> group(columns: ["_field"])
@@ -21,7 +22,7 @@ from(bucket: "monitoreo_datacenter")
 
 // 2. PANEL GRAFANA: Estado Actual de Monitoreo Térmico (0=NORMAL, 1=ADVERTENCIA, 2=CRITICO)
 from(bucket: "monitoreo_datacenter")
-  |> range(start: -15m)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "ambiente_sala")
   |> filter(fn: (r) => r["_field"] == "estado_temp_code")
   |> group(columns: ["_field"])
@@ -29,7 +30,7 @@ from(bucket: "monitoreo_datacenter")
 
 // 3. PANEL GRAFANA: Última Lectura de Iluminación Calibrada (%)
 from(bucket: "monitoreo_datacenter")
-  |> range(start: -15m)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "ambiente_sala")
   |> filter(fn: (r) => r["_field"] == "light_pct")
   |> group(columns: ["_field"])
@@ -37,7 +38,7 @@ from(bucket: "monitoreo_datacenter")
 
 // 4. PANEL GRAFANA: Estado de Luminarias (0=APAGADO, 1=PARCIAL, 2=ENCENDIDO)
 from(bucket: "monitoreo_datacenter")
-  |> range(start: -15m)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "ambiente_sala")
   |> filter(fn: (r) => r["_field"] == "estado_luz_code")
   |> group(columns: ["_field"])
@@ -46,7 +47,7 @@ from(bucket: "monitoreo_datacenter")
 // 5a. PANEL GRAFANA: Fecha y Hora de la Última Lectura Recibida
 // Convierte _time a milisegundos epoch; el panel lo muestra con la unidad "dateTimeAsLocal"
 from(bucket: "monitoreo_datacenter")
-  |> range(start: -15m)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "ambiente_sala")
   |> filter(fn: (r) => r["_field"] == "seq_id")
   |> group()
@@ -55,7 +56,7 @@ from(bucket: "monitoreo_datacenter")
 
 // 5b. PANEL GRAFANA: Número de Secuencia (seq_id) de la Última Lectura
 from(bucket: "monitoreo_datacenter")
-  |> range(start: -15m)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r["_measurement"] == "ambiente_sala")
   |> filter(fn: (r) => r["_field"] == "seq_id")
   |> group()
@@ -102,8 +103,7 @@ from(bucket: "monitoreo_datacenter")
 // ============================================================================
 // CONSULTAS DE AUDITORÍA PARA LOS TRES INDICADORES DE DESEMPEÑO (KPIs)
 // Ventana de prueba: últimos 15 minutos. Para que el KPI 2 sea válido, no reinicie
-// la simulación de Wokwi dentro de esa ventana (seq_id volvería a 1) ni pulse los
-// nodos inject (a)-(d) de Node-RED (usan seq_id 101-104).
+// la simulación de Wokwi dentro de esa ventana (seq_id volvería a 1).
 // ============================================================================
 
 // ----------------------------------------------------------------------------

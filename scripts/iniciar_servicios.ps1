@@ -3,8 +3,12 @@
 #   InfluxDB  -> http://localhost:8086
 #   Grafana   -> http://localhost:3000
 #   Node-RED  -> http://localhost:1880
-# Cada servicio se abre en su propia ventana minimizada. Si un servicio ya está
-# escuchando en su puerto, no se vuelve a iniciar.
+# El broker Mosquitto es un servicio de Windows y arranca solo.
+#
+# Cada servicio corre en segundo plano, sin ventana de consola, y escribe su
+# salida en un archivo de la carpeta <Base>\datos\logs. Se hace así porque en
+# Windows un clic dentro de la ventana de consola de un programa lo deja en
+# pausa. Si un servicio ya está escuchando en su puerto, no se vuelve a iniciar.
 #
 # Uso:  powershell -ExecutionPolicy Bypass -File scripts\iniciar_servicios.ps1
 #       (opcional)  -Base "C:\ruta\donde\descomprimio\influxdb-y-grafana"
@@ -25,6 +29,14 @@ function Wait-Port([int]$Port, [int]$Seconds = 60) {
     return $false
 }
 
+# Lanza un programa oculto y redirige su salida a un archivo de registro
+function Start-Hidden([string]$CommandLine, [string]$LogFile) {
+    Start-Process -FilePath 'cmd.exe' -WindowStyle Hidden -ArgumentList @('/c', "`"$CommandLine > `"$LogFile`" 2>&1`"")
+}
+
+$logs = Join-Path $Base 'datos\logs'
+New-Item -ItemType Directory -Force $logs | Out-Null
+
 # Credenciales locales (solo se usan la primera vez que arranca Grafana)
 $envFile = Join-Path $PSScriptRoot '..\.env'
 $cfg = @{}
@@ -40,12 +52,7 @@ if (Test-Port 8086) {
     if (-not (Test-Path $influxd)) { Write-Host "No se encontro $influxd"; exit 1 }
     $datos = Join-Path $Base 'datos\influxdb'
     New-Item -ItemType Directory -Force $datos | Out-Null
-    Start-Process -FilePath $influxd -WindowStyle Minimized -ArgumentList @(
-        '--bolt-path', "`"$datos\influxd.bolt`"",
-        '--engine-path', "`"$datos\engine`"",
-        '--http-bind-address', '127.0.0.1:8086',
-        '--reporting-disabled'
-    )
+    Start-Hidden "`"$influxd`" --bolt-path `"$datos\influxd.bolt`" --engine-path `"$datos\engine`" --http-bind-address 127.0.0.1:8086 --reporting-disabled" (Join-Path $logs 'influxdb.log')
     Write-Host "InfluxDB iniciando..."
 }
 
@@ -66,9 +73,8 @@ if (Test-Port 3000) {
     $env:GF_USERS_DEFAULT_LANGUAGE = 'es-ES'
     if ($cfg.GRAFANA_USERNAME) { $env:GF_SECURITY_ADMIN_USER = $cfg.GRAFANA_USERNAME }
     if ($cfg.GRAFANA_PASSWORD) { $env:GF_SECURITY_ADMIN_PASSWORD = $cfg.GRAFANA_PASSWORD }
-    Start-Process -FilePath (Join-Path $grafanaHome.FullName 'bin\grafana.exe') -WindowStyle Minimized -ArgumentList @(
-        'server', '--homepath', "`"$($grafanaHome.FullName)`""
-    )
+    $grafanaExe = Join-Path $grafanaHome.FullName 'bin\grafana.exe'
+    Start-Hidden "`"$grafanaExe`" server --homepath `"$($grafanaHome.FullName)`"" (Join-Path $logs 'grafana.log')
     Write-Host "Grafana iniciando..."
 }
 
@@ -82,7 +88,7 @@ if (Test-Port 1880) {
         $nodeRed = Join-Path $prefix 'node-red.cmd'
     }
     if (-not (Test-Path $nodeRed)) { Write-Host "No se encontro Node-RED. Instalelo con: npm install -g node-red"; exit 1 }
-    Start-Process -FilePath 'cmd.exe' -WindowStyle Minimized -ArgumentList @('/c', "`"$nodeRed`"")
+    Start-Hidden "`"$nodeRed`"" (Join-Path $logs 'node-red.log')
     Write-Host "Node-RED iniciando..."
 }
 
@@ -97,3 +103,8 @@ foreach ($s in $servicios) {
     $estado = if (Wait-Port $s.Puerto 90) { 'LISTO      ' } else { 'NO RESPONDE' }
     Write-Host ("{0,-9} {1}  {2}" -f $s.Nombre, $estado, $s.Url)
 }
+$mosquitto = Get-Service mosquitto -ErrorAction SilentlyContinue
+$estadoM = if ($mosquitto -and $mosquitto.Status -eq 'Running') { 'LISTO      ' } else { 'NO RESPONDE' }
+Write-Host ("{0,-9} {1}  {2}" -f 'Mosquitto', $estadoM, 'localhost:1883 (servicio de Windows)')
+Write-Host ""
+Write-Host "Registros de los servicios: $logs"

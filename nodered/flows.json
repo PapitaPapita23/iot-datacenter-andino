@@ -198,7 +198,7 @@
     "name": "Log ALERTA CRÍTICA",
     "active": true,
     "tosidebar": true,
-    "console": true,
+    "console": false,
     "tostatus": true,
     "complete": "payload",
     "targetType": "msg",
@@ -226,106 +226,6 @@
     "wires": []
   },
   {
-    "id": "inject_escenario_a",
-    "type": "inject",
-    "z": "tab_datacenter_andino",
-    "name": "Prueba (a): Normal (24.5°C, 6 lux = 12%)",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":101,\"temperature_c\":24.5,\"humidity_pct\":48.0,\"ldr_raw\":3604,\"light_lux\":6.0,\"light_pct\":12.0,\"sensor_error\":false}",
-    "payloadType": "json",
-    "x": 220,
-    "y": 280,
-    "wires": [
-      [
-        "node_validate_classify"
-      ]
-    ]
-  },
-  {
-    "id": "inject_escenario_b",
-    "type": "inject",
-    "z": "tab_datacenter_andino",
-    "name": "Prueba (b): Advertencia (28.8°C, 7 lux = 14%)",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":102,\"temperature_c\":28.8,\"humidity_pct\":46.5,\"ldr_raw\":3522,\"light_lux\":7.2,\"light_pct\":14.0,\"sensor_error\":false}",
-    "payloadType": "json",
-    "x": 230,
-    "y": 330,
-    "wires": [
-      [
-        "node_validate_classify"
-      ]
-    ]
-  },
-  {
-    "id": "inject_escenario_c",
-    "type": "inject",
-    "z": "tab_datacenter_andino",
-    "name": "Prueba (c): Crítico + Alerta (33.0°C, 8 lux = 15%)",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":103,\"temperature_c\":33.0,\"humidity_pct\":42.0,\"ldr_raw\":3481,\"light_lux\":8.0,\"light_pct\":15.0,\"sensor_error\":false}",
-    "payloadType": "json",
-    "x": 240,
-    "y": 380,
-    "wires": [
-      [
-        "node_validate_classify"
-      ]
-    ]
-  },
-  {
-    "id": "inject_escenario_d",
-    "type": "inject",
-    "z": "tab_datacenter_andino",
-    "name": "Prueba (d): Cambio Luz Activa (25.0°C, 1400 lux = 86.5%)",
-    "props": [
-      {
-        "p": "payload"
-      }
-    ],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0.1,
-    "topic": "",
-    "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":104,\"temperature_c\":25.0,\"humidity_pct\":47.5,\"ldr_raw\":553,\"light_lux\":1400.0,\"light_pct\":86.5,\"sensor_error\":false}",
-    "payloadType": "json",
-    "x": 250,
-    "y": 430,
-    "wires": [
-      [
-        "node_validate_classify"
-      ]
-    ]
-  },
-  {
     "id": "inject_escenario_e",
     "type": "inject",
     "z": "tab_datacenter_andino",
@@ -342,8 +242,8 @@
     "topic": "",
     "payload": "{\"node_id\":\"esp32-sala-01\",\"location\":\"Sala_Servidores_Principal\",\"seq_id\":105,\"temperature_c\":null,\"humidity_pct\":null,\"ldr_raw\":3500,\"light_lux\":7.5,\"light_pct\":14.5,\"sensor_error\":true}",
     "payloadType": "json",
-    "x": 240,
-    "y": 480,
+    "x": 230,
+    "y": 300,
     "wires": [
       [
         "node_validate_classify"
@@ -357,7 +257,7 @@
     "name": "KPI 1: sonda de latencia MQTT (Node-RED -> Mosquitto -> Node-RED) cada 10 s",
     "info": "Publica una marca de tiempo en el broker y mide cuánto tarda en volver. Usa un solo reloj (el de Node-RED), por lo que no depende de la velocidad de la simulación de Wokwi.",
     "x": 310,
-    "y": 560,
+    "y": 400,
     "wires": []
   },
   {
@@ -378,7 +278,7 @@
     "payload": "",
     "payloadType": "date",
     "x": 130,
-    "y": 610,
+    "y": 450,
     "wires": [
       [
         "probe_build"
@@ -397,7 +297,7 @@
     "finalize": "",
     "libs": [],
     "x": 300,
-    "y": 610,
+    "y": 450,
     "wires": [
       [
         "probe_mqtt_out"
@@ -419,7 +319,7 @@
     "expiry": "",
     "broker": "mqtt_broker_local",
     "x": 490,
-    "y": 610,
+    "y": 450,
     "wires": []
   },
   {
@@ -436,7 +336,7 @@
     "rh": 0,
     "inputs": 0,
     "x": 130,
-    "y": 670,
+    "y": 510,
     "wires": [
       [
         "probe_measure"
@@ -455,7 +355,7 @@
     "finalize": "",
     "libs": [],
     "x": 330,
-    "y": 670,
+    "y": 510,
     "wires": [
       [
         "probe_influx"
@@ -477,7 +377,7 @@
     "org": "DataCenter_Andino_SAC",
     "bucket": "monitoreo_datacenter",
     "x": 610,
-    "y": 670,
+    "y": 510,
     "wires": []
   }
 ]
